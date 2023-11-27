@@ -16,6 +16,7 @@ namespace Programster\PgsqlLogger;
 use PgSql\Connection;
 use PgSql\Result;
 use Programster\Log\AbstractLogger;
+use Programster\Log\Exceptions\ExceptionInvalidLogLevel;
 use Ramsey\Uuid\Uuid;
 
 final class PgSqlLogger extends AbstractLogger
@@ -34,7 +35,11 @@ final class PgSqlLogger extends AbstractLogger
      * @param string $logLevelEnumName - the name of the enum in the table that represents the log level.
      * @return void - (constructor)
      */
-    public function __construct(Connection $connection, string $logTable = "log", string $logLevelEnumName = "log_level")
+    public function __construct(
+        Connection $connection,
+        string $logTable = "log",
+        string $logLevelEnumName = "log_level"
+    )
     {
         $this->m_connection = $connection;
         $this->m_logTableName = $logTable;
@@ -103,16 +108,14 @@ final class PgSqlLogger extends AbstractLogger
 
     private function createLogsTable() : void
     {
-
-
         $createLogsTableQuery =
             "CREATE TABLE " . pg_escape_identifier($this->m_connection, $this->m_logTableName) . " (
-                uuid UUID NOT NULL,
+                id UUID NOT NULL,
                 message TEXT NOT NULL,
                 level {$this->m_logLevelEnumName} NOT NULL,
                 context JSONB NOT NULL,
                 created_at DECIMAL(15,4) NOT NULL,
-                PRIMARY KEY (uuid)
+                PRIMARY KEY (id)
             )";
 
         $createResult = pg_query($this->m_connection, $createLogsTableQuery);
@@ -140,6 +143,7 @@ final class PgSqlLogger extends AbstractLogger
      * @param array $context - name value pairs providing context to error, e.g. "dbname => "yolo")
      *
      * @return void
+     * @throws ExceptionInvalidLogLevel
      */
     public function log($level, $message, array $context = array()) : void
     {
@@ -147,7 +151,7 @@ final class PgSqlLogger extends AbstractLogger
         $contextString = json_encode($context, JSON_UNESCAPED_SLASHES);
 
         $params = array(
-            'uuid' => pg_escape_string($this->m_connection, $this->generateUuid()),
+            'id' => pg_escape_string($this->m_connection, $this->generateUuid()),
             'message'  => pg_escape_string($this->m_connection, $message),
             'level' => $logLevelEnum->value,
             'context'  => pg_escape_string($this->m_connection, $contextString),
@@ -155,8 +159,8 @@ final class PgSqlLogger extends AbstractLogger
         );
 
         $query =
-            "INSERT INTO " . pg_escape_identifier($this->m_logTableName) . " (uuid, message, level, context, created_at)" .
-            " VALUES ('{$params['uuid']}','{$params['message']}', '{$params['level']}', '{$params['context']}', {$params['created_at']})";
+            "INSERT INTO " . pg_escape_identifier($this->m_logTableName) . " (id, message, level, context, created_at)" .
+            " VALUES ('{$params['id']}','{$params['message']}', '{$params['level']}', '{$params['context']}', {$params['created_at']})";
 
         $result = pg_query($this->m_connection, $query);
 
