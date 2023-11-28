@@ -159,7 +159,7 @@ final class PgSqlLogger extends AbstractLogger
         );
 
         $query =
-            "INSERT INTO " . pg_escape_identifier($this->m_logTableName) . " (id, message, level, context, created_at)" .
+            "INSERT INTO " . pg_escape_identifier($this->m_connection, $this->m_logTableName) . " (id, message, level, context, created_at)" .
             " VALUES ('{$params['id']}','{$params['message']}', '{$params['level']}', '{$params['context']}', {$params['created_at']})";
 
         $result = pg_query($this->m_connection, $query);
