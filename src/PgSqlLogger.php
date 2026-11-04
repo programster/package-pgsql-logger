@@ -17,6 +17,7 @@ use PgSql\Connection;
 use PgSql\Result;
 use Programster\Log\AbstractLogger;
 use Programster\Log\Exceptions\ExceptionInvalidLogLevel;
+use Psr\Clock\ClockInterface;
 use Ramsey\Uuid\Uuid;
 
 final class PgSqlLogger extends AbstractLogger
@@ -24,6 +25,7 @@ final class PgSqlLogger extends AbstractLogger
     private readonly Connection $m_connection;
     private readonly string $m_logTableName;
     private readonly string $m_logLevelEnumName;
+    private readonly ClockInterface $m_clock;
 
 
     /**
@@ -31,17 +33,27 @@ final class PgSqlLogger extends AbstractLogger
      * @param Connection $connection - the connection from pg_connect
      * @param string $logTable - the name of the table that will store the logs
      * @param string $logLevelEnumName - the name of the enum in the table that represents the log level.
+     * @param ClockInterface|null $clock - an optional PSR-20 clock to timestamp the logs' created_at with, such as
+     * an application's fake/offset "system clock". If not provided, the real current time is used. Note that the
+     * clock only affects created_at, and the log's id is always generated from the real time.
      * @return void - (constructor)
      */
     public function __construct(
         Connection $connection,
         string $logTable = "log",
-        string $logLevelEnumName = "log_level"
+        string $logLevelEnumName = "log_level",
+        ?ClockInterface $clock = null
     )
     {
         $this->m_connection = $connection;
         $this->m_logTableName = $logTable;
         $this->m_logLevelEnumName = $logLevelEnumName;
+        $this->m_clock = $clock ?? new class implements ClockInterface {
+            public function now() : \DateTimeImmutable
+            {
+                return new \DateTimeImmutable('now');
+            }
+        };
 
         if ($this->doesLogTableEnumExist() === false) { $this->createLogsTableEnum(); }
         if ($this->doesLogsTableExist()    === false) { $this->createLogsTable();     }
@@ -123,11 +135,16 @@ final class PgSqlLogger extends AbstractLogger
         $contextString = json_encode($context, JSON_UNESCAPED_SLASHES);
 
         $params = array(
+            // The id is deliberately generated from the REAL time rather than the clock, so that ids are always in
+            // real insertion order, even if the clock is moved backwards or forwards. Applications rely on this to
+            // order and paginate logs by id.
             $this->generateUuid(),
             (string)$message,
             $logLevelEnum->value,
             $contextString,
-            microtime(true),
+            // A unix timestamp (which is always UTC, whatever the clock's timezone) with microseconds. It's passed
+            // as a string rather than a float to avoid any precision loss, and the DECIMAL(15,4) column rounds it.
+            $this->m_clock->now()->format('U.u'),
         );
 
         $query =
@@ -182,7 +199,8 @@ final class PgSqlLogger extends AbstractLogger
 
 
     /**
-     * Generates a time-ordered UUIDv7, which keeps inserts into the primary key index efficient.
+     * Generates a time-ordered UUIDv7 from the real current time, which keeps inserts into the primary key index
+     * efficient, and keeps ids in real insertion order. This must not be given the clock's time (see log()).
      * @return string - the generated UUID
      */
     private function generateUuid() : string

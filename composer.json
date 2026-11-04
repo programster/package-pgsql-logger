@@ -15,7 +15,8 @@
         "psr/log": "^3.0",
         "programster/log": "^2.0 || ^3.0",
         "ext-pgsql": "*",
-        "ramsey/uuid": "^4.7"
+        "ramsey/uuid": "^4.7",
+        "psr/clock": "^1.0"
     },
     "autoload": {
         "psr-4": {
