@@ -37,6 +37,7 @@ final class PgSqlLogger extends AbstractLogger
      * an application's fake/offset "system clock". If not provided, the real current time is used. Note that the
      * clock only affects created_at, and the log's id is always generated from the real time.
      * @return void - (constructor)
+     * @throws \Exception - if the log level type or logs table don't exist and couldn't be created.
      */
     public function __construct(
         Connection $connection,
@@ -48,27 +49,50 @@ final class PgSqlLogger extends AbstractLogger
         $this->m_connection = $connection;
         $this->m_logTableName = $logTable;
         $this->m_logLevelEnumName = $logLevelEnumName;
-        $this->m_clock = $clock ?? new class implements ClockInterface {
-            public function now() : \DateTimeImmutable
-            {
-                return new \DateTimeImmutable('now');
-            }
-        };
 
+        /*
+         * Create the clock for the user if one was not provided. E.g. just
+         * uses normal time as one would expect.
+         */
+        if ($clock === null)
+        {
+            $clock = new class implements ClockInterface {
+                public function now() : \DateTimeImmutable
+                {
+                    return new \DateTimeImmutable('now');
+                }
+            };
+        }
+
+        $this->m_clock = $clock;
         if ($this->doesLogTableEnumExist() === false) { $this->createLogsTableEnum(); }
         if ($this->doesLogsTableExist()    === false) { $this->createLogsTable();     }
     }
 
 
+    /**
+     * Checks whether the enum type for the log level column already exists in the database.
+     * @return bool - true if the type exists, false otherwise.
+     * @throws \Exception - if the query fails.
+     */
     public function doesLogTableEnumExist() : bool
     {
-        $query = "select exists (select 1 from pg_type where typname = $1)";
-        $result = $this->runQuery($query, [$this->m_logLevelEnumName], "Failed to check if the log level type exists.");
+        $result = $this->runQuery(
+            "SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = $1)",
+            [$this->m_logLevelEnumName],
+            "Failed to check if the log level type exists."
+        );
+
         $row = pg_fetch_array($result);
         return $row['exists'] === 't';
     }
 
 
+    /**
+     * Checks whether the logs table already exists in the public schema.
+     * @return bool - true if the table exists, false otherwise.
+     * @throws \Exception - if the query fails.
+     */
     private function doesLogsTableExist() : bool
     {
         $query = "SELECT EXISTS(
@@ -78,12 +102,22 @@ final class PgSqlLogger extends AbstractLogger
               table_schema = 'public' AND table_name = $1
         ) as exists";
 
-        $result = $this->runQuery($query, [$this->m_logTableName], "Failed to check if the logs table exists.");
+        $result = $this->runQuery(
+            $query,
+            [$this->m_logTableName],
+            "Failed to check if the logs table exists."
+        );
+
         $resultArray = pg_fetch_array($result);
         return $resultArray['exists'] === "t";
     }
 
 
+    /**
+     * Creates the enum type for the log level column, with a value for each of the PSR-3 log levels.
+     * @return void
+     * @throws \Exception - if the type could not be created.
+     */
     private function createLogsTableEnum() : void
     {
         $createTypeQuery =
@@ -101,6 +135,13 @@ final class PgSqlLogger extends AbstractLogger
         $this->runQuery($createTypeQuery, [], "Failed to create the log level type.");
     }
 
+
+    /**
+     * Creates the logs table, along with an index on the created_at column. The log level enum type must already
+     * exist.
+     * @return void
+     * @throws \Exception - if the table or index could not be created.
+     */
     private function createLogsTable() : void
     {
         $createLogsTableQuery =
@@ -122,29 +163,35 @@ final class PgSqlLogger extends AbstractLogger
     /**
      * Logs with an arbitrary level.
      *
-     * @param int $level - the priority of the message - see LogLevel class
-     * @param string $message -  the message of the error, e.g "failed to connect to db"
-     * @param array $context - name value pairs providing context to error, e.g. "dbname => "yolo")
+     * @param mixed $level - a LogLevel enum, a case-insensitive PSR-3 level string (e.g. "info"), or an integer
+     * from 0 (debug) to 7 (emergency).
+     * @param string|\Stringable $message - the message to log, e.g "failed to connect to db"
+     * @param array $context - name value pairs providing context to the message, e.g. ["dbname" => "yolo"]
      *
      * @return void
-     * @throws ExceptionInvalidLogLevel
+     * @throws ExceptionInvalidLogLevel - if the level is not valid.
+     * @throws \Exception - if the log could not be inserted into the database.
      */
-    public function log($level, $message, array $context = array()) : void
+    public function log($level, string|\Stringable $message, array $context = []) : void
     {
         $logLevelEnum = $this->convertLogLevelMixedVariable($level);
         $contextString = json_encode($context, JSON_UNESCAPED_SLASHES);
 
+        // A unix timestamp (which is always UTC, whatever the clock's timezone) with microseconds. It's passed
+        // as a string rather than a float to avoid any precision loss, and the DECIMAL(15,4) column rounds it.
+        $createdAt = $this->m_clock->now()->format('U.u');
+
+        // The id is deliberately generated from the REAL time rather than the clock, so that ids are always in
+        // real insertion order, even if the clock is moved backwards or forwards. Applications rely on this to
+        // order and paginate logs by id.
+        $logId = Uuid::uuid7()->toString();
+
         $params = array(
-            // The id is deliberately generated from the REAL time rather than the clock, so that ids are always in
-            // real insertion order, even if the clock is moved backwards or forwards. Applications rely on this to
-            // order and paginate logs by id.
-            Uuid::uuid7()->toString(),
+            $logId,
             (string)$message,
             $logLevelEnum->value,
             $contextString,
-            // A unix timestamp (which is always UTC, whatever the clock's timezone) with microseconds. It's passed
-            // as a string rather than a float to avoid any precision loss, and the DECIMAL(15,4) column rounds it.
-            $this->m_clock->now()->format('U.u'),
+            $createdAt,
         );
 
         $query =
