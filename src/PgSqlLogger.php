@@ -138,7 +138,7 @@ final class PgSqlLogger extends AbstractLogger
             // The id is deliberately generated from the REAL time rather than the clock, so that ids are always in
             // real insertion order, even if the clock is moved backwards or forwards. Applications rely on this to
             // order and paginate logs by id.
-            $this->generateUuid(),
+            Uuid::uuid7()->toString(),
             (string)$message,
             $logLevelEnum->value,
             $contextString,
@@ -195,16 +195,5 @@ final class PgSqlLogger extends AbstractLogger
         }
 
         return $result;
-    }
-
-
-    /**
-     * Generates a time-ordered UUIDv7 from the real current time, which keeps inserts into the primary key index
-     * efficient, and keeps ids in real insertion order. This must not be given the clock's time (see log()).
-     * @return string - the generated UUID
-     */
-    private function generateUuid() : string
-    {
-        return Uuid::uuid7()->toString();
     }
 }
