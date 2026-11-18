@@ -17,8 +17,9 @@ use PgSql\Connection;
 use PgSql\Result;
 use Programster\Log\AbstractLogger;
 use Programster\Log\Exceptions\ExceptionInvalidLogLevel;
+use Programster\PgsqlLib\PgsqlLib;
+use Programster\PgsqlLib\UuidVersion;
 use Psr\Clock\ClockInterface;
-use Ramsey\Uuid\Uuid;
 
 final class PgSqlLogger extends AbstractLogger
 {
@@ -184,7 +185,7 @@ final class PgSqlLogger extends AbstractLogger
         // The id is deliberately generated from the REAL time rather than the clock, so that ids are always in
         // real insertion order, even if the clock is moved backwards or forwards. Applications rely on this to
         // order and paginate logs by id.
-        $logId = Uuid::uuid7()->toString();
+        $logId = PgsqlLib::generateUuid(UuidVersion::V7);
 
         $params = array(
             $logId,
