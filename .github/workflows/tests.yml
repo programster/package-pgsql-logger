@@ -1,0 +1,57 @@
+# Runs lint, the smoke tests and PHPStan on every supported version of PHP, and the smoke tests on every supported
+# version of PostgreSQL, using the same scripts as running them locally (testing/run-all-php-versions.sh and
+# testing/run-all-postgresql-versions.sh), which test each version in its own Docker container.
+# The results are also written as annotations (testing/github-annotations.sh), which can be read without logging in.
+# The README's "Tests" badge shows the result of the latest run on the default branch.
+name: Tests
+
+on:
+    # Pushes to the main branch (not work-in-progress branches), and every tag, e.g. a new release.
+    push:
+        branches:
+            - main
+        tags:
+            - "*"
+    # Pull requests into the main branch, so they are tested before being merged.
+    pull_request:
+        branches:
+            - main
+    # Adds a "Run workflow" button on the Actions tab, to run the tests by hand on any branch.
+    workflow_dispatch:
+
+# The tests only need to read the code.
+permissions:
+    contents: read
+
+jobs:
+    tests:
+        name: Lint, tests and PHPStan on PHP 8.2, 8.3, 8.4 and 8.5, and tests on PostgreSQL 14, 15, 16, 17 and 18
+        runs-on: ubuntu-latest
+        timeout-minutes: 30
+
+        steps:
+            - name: Check out the code
+              uses: actions/checkout@v5
+
+            # The tests use vendor/autoload.php. The runner's own PHP is only used to run Composer.
+            - name: Install Composer dependencies
+              run: composer install --no-interaction --no-progress --prefer-dist
+
+            - name: Run lint, the tests and PHPStan on every supported version of PHP
+              run: |
+                  # GitHub runs bash with -e, which would stop here if the tests failed, so catch the exit code instead.
+                  # pipefail (which GitHub also sets) makes it the tests' exit code, rather than tee's.
+                  set -o pipefail
+                  status=0
+                  bash testing/run-all-php-versions.sh 2>&1 | tee test-output.txt || status=$?
+                  bash testing/github-annotations.sh "PHP versions" test-output.txt "$status"
+                  exit $status
+
+            - name: Run the tests on every supported version of PostgreSQL
+              if: ${{ !cancelled() }}
+              run: |
+                  set -o pipefail
+                  status=0
+                  bash testing/run-all-postgresql-versions.sh 2>&1 | tee postgresql-output.txt || status=$?
+                  bash testing/github-annotations.sh "PostgreSQL versions" postgresql-output.txt "$status"
+                  exit $status

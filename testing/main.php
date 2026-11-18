@@ -1,80 +1,62 @@
 <?php
 
-use Programster\Log\PgSqlLogger;
+/*
+ * Runs the smoke tests in testing/tests/ against a throwaway PostgreSQL database (see TestDatabase). This is used by
+ * run-all-php-versions.sh and run-all-postgresql-versions.sh, but it can also be run directly:
+ * TEST_DB_HOST=... TEST_DB_NAME=... TEST_DB_USER=... TEST_DB_PASSWORD=... php -d zend.assertions=1 testing/main.php
+ * Exits with 0 if everything passed, or 1 if anything failed.
+ */
 
 require_once(__DIR__ . '/../vendor/autoload.php');
 
+use Programster\PgsqlLogger\Testing\SmokeTest;
+use Programster\PgsqlLogger\Testing\TestDatabase;
 
-function getConnection(
-    $host,
-    $dbName,
-    $user,
-    $password,
-    $port="5432",
-    $useUtf8=true,
-    $forceNew=false,
-    $useAsync=false
-)
+
+# The tests check things with assert(), which does nothing when zend.assertions is 0 or -1, so every test would pass
+# without checking anything. It can be switched from 0 to 1 here, but -1 (the usual production setting) can only be
+# changed in php.ini or on the command line.
+if (ini_get('zend.assertions') !== '1' && @ini_set('zend.assertions', '1') === false)
 {
-    if ($forceNew && $useAsync)
-    {
-        $forceNew = false;
-    }
-
-    $connString =
-        "host=" . $host
-        . " dbname=" . $dbName
-        . " user=" . $user
-        . " password=" . $password
-        . " port=" . $port;
-
-    if ($useUtf8)
-    {
-        $connString .= " options='--client_encoding=UTF8'";
-    }
-
-    if ($useAsync)
-    {
-        $connection = pg_connect($connString, PGSQL_CONNECT_ASYNC);
-    }
-    elseif ($forceNew)
-    {
-        $connection = pg_connect($connString, PGSQL_CONNECT_FORCE_NEW);
-    }
-    else
-    {
-        $connection = pg_connect($connString);
-    }
-
-    if ($connection == false)
-    {
-        throw new Exception("Failed to initialize database connection.");
-    }
-
-    return $connection;
+    echo "zend.assertions must be 1 for the tests to check anything. Run: php -d zend.assertions=1 " . __FILE__ . "\n";
+    exit(1);
 }
 
+ini_set('assert.exception', '1');
+TestDatabase::dropAll();
+$smoke = new SmokeTest();
+$testFiles = glob(__DIR__ . '/tests/*Test.php');
 
-function main()
+if ($testFiles === false)
 {
-    $connection = getConnection(host: "127.0.0.1", user: "testuser", dbName: "testdb", password: "testPassword");
-    $logger = new \Programster\PgsqlLogger\PgSqlLogger($connection, "log", "log_level");
-    $logger->debug("This is an info log", ['name' => 'value']);
-    $logger->notice("This is a notice log", ['name' => 'value']);
-    $logger->info("This is an info log", ['name' => 'value']);
-    $logger->warning("This is a warning log", ['name' => 'value']);
-    $logger->alert("This is an alert log", ['name' => 'value']);
-    $logger->emergency("This is an emergency log", ['name' => 'value']);
-    $logger->critical("This is a critical log", ['name' => 'value']);
-    $logger->log(\Psr\Log\LogLevel::WARNING, "This is another warning log", ['name' => 'value']);
-    $logger->info("You can log with just a message and no context.");
-
-
-    $query = "SELECT * FROM " . pg_escape_identifier($connection, "log");
-    $result = pg_query($connection, $query);
-    /* @var $result \PgSql\Result */
-    $rows = pg_fetch_all($result);
-    print "Logs found in database: " . print_r($rows, true) . PHP_EOL;
+    echo "Couldn't list the test files in " . __DIR__ . "/tests.\n";
+    exit(1);
 }
 
-main();
+sort($testFiles);
+
+foreach ($testFiles as $testFile)
+{
+    require $testFile;
+}
+
+$failures = $smoke->getFailures();
+
+# With PGSQL_LOGGER_TEST_ONLY, a name that matches nothing would otherwise pass without checking anything.
+$only = getenv("PGSQL_LOGGER_TEST_ONLY");
+
+if ($only !== false && $only !== "" && $smoke->getNumPassed() === 0 && count($failures) === 0)
+{
+    $failures[] = "PGSQL_LOGGER_TEST_ONLY: no test's name contains \"{$only}\", so nothing was run.";
+}
+
+$serverVersion = pg_version(TestDatabase::get())['server'] ?? 'unknown';
+$numPassed = $smoke->getNumPassed();
+printf("PHP %s, PostgreSQL %s: %d passed, %d failed\n", PHP_VERSION, $serverVersion, $numPassed, count($failures));
+
+foreach ($failures as $failure)
+{
+    echo "  FAIL {$failure}\n";
+}
+
+exit(count($failures) === 0 ? 0 : 1);

@@ -1,7 +1,8 @@
 {
     "name": "programster/pgsql-logger",
-    "description": "A logger that logs to a PostgreSQL database and is compatible with PSR-3",
-    "keywords": ["log", "logging", "pgsql"],
+    "type": "library",
+    "description": "A PSR-3 logger that logs to a PostgreSQL database, creating its own table.",
+    "keywords": ["log", "logging", "logger", "psr-3", "pgsql", "postgresql"],
     "homepage": "https://github.com/programster/package-pgsql-logger",
     "license": "MIT",
     "authors": [
@@ -11,16 +12,24 @@
         }
     ],
     "require": {
-        "php": ">=8.2.0",
-        "psr/log": "^3.0",
-        "programster/log": "^2.0 || ^3.0",
+        "php": "^8.2",
         "ext-pgsql": "*",
+        "programster/log": "^4.0",
         "programster/pgsql-lib": "^3.2",
-        "psr/clock": "^1.0"
+        "psr/clock": "^1.0",
+        "psr/log": "^3.0"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.1"
     },
     "autoload": {
         "psr-4": {
             "Programster\\PgsqlLogger\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Programster\\PgsqlLogger\\Testing\\": "testing/"
         }
     }
 }

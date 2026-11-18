@@ -1,59 +1,82 @@
-# PostgreSQL Logger Package
-A PSR-3 logger for logging to a PostgreSQL database in PHP.
+# PostgreSQL Logger
+
+[![Tests](https://github.com/programster/package-pgsql-logger/actions/workflows/tests.yml/badge.svg)](https://github.com/programster/package-pgsql-logger/actions/workflows/tests.yml)
+
+- [What it's for](#what-its-for)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Design principles](#design-principles)
+- [Documentation](#documentation)
+    - [Logging](docs/logging.md)
+    - [Testing](docs/testing.md)
+    - [Upgrading](docs/upgrading.md)
+- [Licence](#licence)
+
+## What it's for
+A [PSR-3](https://www.php-fig.org/psr/psr-3/) logger that writes logs to a PostgreSQL table, which it can create for
+you (in any schema), or give you the SQL for, to run in your own migrations.
+Each log has a UUIDv7 ID (so ordering by it gives the order they were written in), its message, its level, its context
+as `jsonb` (so you can query it), and when it was logged. It's safe to use in long-running processes, such as workers
+and daemons, as it reconnects if the database restarts.
+
+It extends [`programster/log`](https://github.com/programster/package-logging)'s `AbstractLogger`, so it works with
+that package's other loggers, e.g. as one of a `FailoverLogger`'s loggers.
+
+## Requirements
+- PHP 8.2, 8.3, 8.4 or 8.5, with the `pgsql` extension.
+- PostgreSQL 14, 15, 16, 17 or 18.
 
 ## Installation
-
 ```bash
 composer require programster/pgsql-logger
 ```
 
-## Example Usage
-
+## Quick start
 ```php
-# Connect to your database
-$pgsqlConn = pg_connect($connectionString);
+use Programster\PgsqlLogger\PgSqlLogger;
 
-# Create the logger using your Pgsql connection.
-$logger = new \Programster\PgsqlLogger\PgSqlLogger($pgsqlConn);
+$connection = pg_connect("host=localhost dbname=app user=app password=secret");
 
-# Create some logs using the standard PSR-3 interface
-$logger->debug("This is an info log");
-$logger->notice("This is a notice log", ['name' => 'value']);
-$logger->info("This is an info log", ['name' => 'value']);
-$logger->warning("This is a warning log", ['name' => 'value']);
-$logger->alert("This is an alert log", ['name' => 'value']);
-$logger->emergency("This is an emergency log", ['name' => 'value']);
-$logger->critical("This is a critical log", ['name' => 'value']);
-$logger->log(\Psr\Log\LogLevel::WARNING, "This is another warning log", ['name' => 'value']);
+// Create the "log" table (and its "log_level" type), if they don't exist, e.g. when the application starts. Or put
+// the SQL from PgSqlLogger::getCreateTablesSql() in your own migrations.
+PgSqlLogger::createTables($connection);
+$logger = new PgSqlLogger($connection);
+
+$logger->info("A user signed in.", ['userId' => 5]);
+$logger->warning("The disk is nearly full.", ['freeBytes' => 1024]);
+
+try
+{
+    throw new RuntimeException("The payment provider timed out.");
+}
+catch (RuntimeException $exception)
+{
+    $logger->error("A payment failed.", ['exception' => $exception]);
+}
 ```
 
-## Using a Custom Clock
-You can optionally pass a [PSR-20](https://www.php-fig.org/psr/psr-20/) clock as the last constructor parameter.
-This is useful if your application uses a fake or offset "system clock" (e.g. for testing time-based jobs), and
-you want the logs to be timestamped with that clock rather than the real time.
+See [Logging](docs/logging.md) for creating the table in your own migrations or another schema, levels, context, a
+custom clock, and reconnecting.
 
-```php
-$logger = new \Programster\PgsqlLogger\PgSqlLogger($pgsqlConn, clock: $myClock);
-```
+## Design principles
+- **Your migrations, or ours.** `createTables()` creates the table when your application starts, or
+  `getCreateTablesSql()` gives you the SQL to run in your own migrations. Either is safe to run again. A logger
+  created before its table exists throws straight away, saying how to create it, rather than at the first log.
+- **A log is never lost to bad characters.** Invalid UTF-8 and NUL characters, which PostgreSQL can't store, are
+  replaced with U+FFFD (the replacement character), in the message and the context.
+- **Failures throw.** A log that can't be written throws an exception, rather than being dropped silently, so it can be
+  caught (e.g. by a `FailoverLogger`, to log somewhere else).
+- **IDs are in the order logs were written**, even if your application's clock moves, so you can page through logs by
+  ID.
 
-If no clock is provided, the real current time is used.
+## Documentation
+The [`docs`](docs/) folder has the full documentation:
 
-The clock is only used for the `created_at` column, which is stored as a unix timestamp (UTC) with sub-second
-precision. The log's `id` (a UUIDv7) is always generated from the real time, so ids stay in real insertion order
-even if the clock is moved backwards or forwards. If you need logs in the order they were written, order by `id`.
-If you need them in the order of your application's clock, order by `created_at`.
+- [Logging](docs/logging.md): creating the table (or getting the SQL for your migrations), schemas, levels,
+  context, characters PostgreSQL can't store, a custom clock, reconnecting, and errors.
+- [Testing](docs/testing.md): running the package's tests.
+- [Upgrading](docs/upgrading.md): what changed in each release.
 
-
-## Reconnecting After Database Restarts
-The logger is safe to use in long-running processes, such as background workers and daemons. If the database
-is restarted, or the connection is lost, the next log call will reset the connection with
-`pg_connection_reset()` and retry once. If the database is still unavailable, an exception is thrown, and the
-next call will try to reconnect again.
-
-Note that the connection you pass to the logger is the one that gets reset, so any other code in your application
-sharing that connection will also be reconnected.
-
-
-## Testing
-Spin up a test database using the docker-compose.yml file, before running the `main.php` script that
-will test connecting to the database and creating some logs.
+## Licence
+MIT. See [LICENSE](LICENSE).

@@ -1,0 +1,13 @@
+# Editor settings for this repository. See https://editorconfig.org
+root = true
+
+[*.php]
+# Hard limit: no line of code may be longer than 120 characters. PhpStorm uses this as its right
+# margin (where it hard wraps and warns about long lines), and so do other editors that support
+# max_line_length.
+max_line_length = 120
+
+# Soft limit: docblocks and other comments should wrap at 100 characters, to keep them easy to read.
+# EditorConfig can't set a different limit for comments, so this is only a guide line drawn at
+# column 100 in PhpStorm (other editors ignore it), rather than something that is enforced.
+ij_visual_guides = 100

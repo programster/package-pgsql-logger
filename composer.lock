@@ -4,35 +4,94 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f7ba80ed621ddc094ed3df24e5769e0a",
+    "content-hash": "260e15ec362648bb2d2e12e8897b9fc0",
     "packages": [
         {
-            "name": "programster/log",
-            "version": "3.0.0",
+            "name": "programster/collections",
+            "version": "3.1.0",
             "source": {
                 "type": "git",
-                "url": "https://github.com/programster/package-logging.git",
-                "reference": "43de171a28ebacf4b9563367c5b4fd4e55b64f20"
+                "url": "https://github.com/programster/package-collections.git",
+                "reference": "be4107815cee58a1c2c67587641cd6863fbfa8a9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/programster/package-logging/zipball/43de171a28ebacf4b9563367c5b4fd4e55b64f20",
-                "reference": "43de171a28ebacf4b9563367c5b4fd4e55b64f20",
+                "url": "https://api.github.com/repos/programster/package-collections/zipball/be4107815cee58a1c2c67587641cd6863fbfa8a9",
+                "reference": "be4107815cee58a1c2c67587641cd6863fbfa8a9",
                 "shasum": ""
             },
             "require": {
-                "php": ">=8.2.0",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "phpstan/phpstan": "^2.3"
+            },
+            "suggest": {
+                "phpstan/extension-installer": "Loads this package's PHPStan rules (extension.neon), which report maps created with elements that won't have string keys, and writes to readonly collections and maps with array syntax."
+            },
+            "type": "library",
+            "extra": {
+                "phpstan": {
+                    "includes": [
+                        "extension.neon"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Programster\\Collections\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Stuart Page",
+                    "email": "sdpagent@gmail.com",
+                    "homepage": "https://blog.programster.org",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Strictly typed collections, including readonly ones for defensive programming.",
+            "homepage": "https://github.com/programster/package-collections",
+            "keywords": [
+                "collection",
+                "library"
+            ],
+            "support": {
+                "issues": "https://github.com/programster/package-collections/issues",
+                "source": "https://github.com/programster/package-collections/tree/3.1.0"
+            },
+            "time": "2026-11-16T17:33:01+00:00"
+        },
+        {
+            "name": "programster/log",
+            "version": "4.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/programster/package-logging.git",
+                "reference": "1cac4ee6ce3e8eecab28eeca1415fd46e666013f"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/programster/package-logging/zipball/1cac4ee6ce3e8eecab28eeca1415fd46e666013f",
+                "reference": "1cac4ee6ce3e8eecab28eeca1415fd46e666013f",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.2",
+                "programster/collections": "^3.0",
                 "psr/log": "^3.0"
             },
             "require-dev": {
-                "phpunit/phpunit": "^11.5"
+                "phpstan/phpstan": "^2.3"
             },
             "type": "library",
             "autoload": {
                 "psr-4": {
-                    "Programster\\Log\\": "src/",
-                    "Programster\\Log\\Exceptions\\": "src/exceptions/",
-                    "Programster\\Log\\Interfaces\\": "src/interfaces/"
+                    "Programster\\Log\\": "src/"
                 }
             },
             "notification-url": "https://packagist.org/downloads/",
@@ -48,14 +107,17 @@
             "description": "A library of loggers that comply with PSR-3",
             "homepage": "https://github.com/programster/package-logging",
             "keywords": [
+                "failover",
                 "log",
-                "logging"
+                "logger",
+                "logging",
+                "psr-3"
             ],
             "support": {
                 "issues": "https://github.com/programster/package-logging/issues",
-                "source": "https://github.com/programster/package-logging/tree/3.0.0"
+                "source": "https://github.com/programster/package-logging/tree/4.0.0"
             },
-            "time": "2026-11-03T20:26:38+00:00"
+            "time": "2026-11-16T16:20:30+00:00"
         },
         {
             "name": "programster/pgsql-lib",
@@ -209,14 +271,79 @@
             "time": "2024-09-11T13:17:53+00:00"
         }
     ],
-    "packages-dev": [],
+    "packages-dev": [
+        {
+            "name": "phpstan/phpstan",
+            "version": "2.3.6",
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/phpstan/phpstan/zipball/00cedebb76cc82c1592414fa4f616cefdccda16f",
+                "reference": "00cedebb76cc82c1592414fa4f616cefdccda16f",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^7.4|^8.0"
+            },
+            "conflict": {
+                "phpstan/phpstan-shim": "*"
+            },
+            "bin": [
+                "phpstan",
+                "phpstan.phar"
+            ],
+            "type": "library",
+            "autoload": {
+                "files": [
+                    "bootstrap.php"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Ondřej Mirtes"
+                },
+                {
+                    "name": "Markus Staab"
+                },
+                {
+                    "name": "Vincent Langlet"
+                }
+            ],
+            "description": "PHPStan - PHP Static Analysis Tool",
+            "keywords": [
+                "dev",
+                "static analysis"
+            ],
+            "support": {
+                "docs": "https://phpstan.org/user-guide/getting-started",
+                "forum": "https://github.com/phpstan/phpstan/discussions",
+                "issues": "https://github.com/phpstan/phpstan/issues",
+                "security": "https://github.com/phpstan/phpstan/security/policy",
+                "source": "https://github.com/phpstan/phpstan-src"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/ondrejmirtes",
+                    "type": "github"
+                },
+                {
+                    "url": "https://github.com/phpstan",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-11-15T19:58:26+00:00"
+        }
+    ],
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {},
     "prefer-stable": false,
     "prefer-lowest": false,
     "platform": {
-        "php": ">=8.2.0",
+        "php": "^8.2",
         "ext-pgsql": "*"
     },
     "platform-dev": {},

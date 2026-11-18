@@ -1,0 +1,10 @@
+# PHPStan's settings for this package. Run it with: php vendor/bin/phpstan
+# testing/run-all-php-versions.sh runs it too, on the lowest supported version of PHP.
+parameters:
+    level: 10
+    phpVersion:
+        min: 80200
+        max: 80599
+    paths:
+        - src
+        - testing
